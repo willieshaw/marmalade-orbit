@@ -1,5 +1,6 @@
 import { config } from './config.js';
-import { normalizeStars, normalizeRewards, unseenCount, newlyUnlocked } from './data.js';
+import { normalizeStars, unseenCount } from './data.js';
+import { normalizeRewardsDoc, occurrences, celebrationsFor } from './rewards.js';
 import { currentSheet, sheetOf, planReveal } from './sheets.js';
 import { groupByMonth, monthLabel } from './logbook.js';
 import { renderChart, renderCount, renderRuler, renderShelf, slotEl, formatDate } from './chart.js';
@@ -11,10 +12,11 @@ import { initAdmin } from './admin.js';
 import * as sfx from './sound.js';
 
 const SEEN_KEY = 'mo.seen';
+const CELEBRATED_KEY = 'mo.celebrated';
 const $ = id => document.getElementById(id);
 
 // `shown` is how many stars are on the chart right now; during a reveal it trails stars.length.
-const state = { stars: [], rewards: [], sheet: 0, shown: 0, busy: false };
+const state = { stars: [], rewards: { rules: [], redeemed: [] }, sheet: 0, shown: 0, busy: false };
 
 function getSeen() {
   try {
@@ -24,6 +26,14 @@ function getSeen() {
 }
 function setSeen(n) {
   try { localStorage.setItem(SEEN_KEY, String(n)); } catch {}
+}
+
+// Reward payouts already celebrated on this device, so each certificate shows once.
+function getCelebrated() {
+  try { return JSON.parse(localStorage.getItem(CELEBRATED_KEY)) || []; } catch { return []; }
+}
+function addCelebrated(keys) {
+  try { localStorage.setItem(CELEBRATED_KEY, JSON.stringify([...new Set([...getCelebrated(), ...keys])])); } catch {}
 }
 
 async function fetchJson(path) {
@@ -37,6 +47,11 @@ async function loadStars() {
   // while GitHub Pages is still rebuilding.
   const doc = admin.unlocked ? (await admin.read()).doc : await fetchJson(config.starsPath);
   return normalizeStars(doc);
+}
+
+async function loadRewards() {
+  const doc = admin.unlocked ? (await admin.readRewards()).doc : await fetchJson(config.rewardsPath);
+  return normalizeRewardsDoc(doc);
 }
 
 function renderAll() {
@@ -53,11 +68,12 @@ async function goToSheet(sheet, { animate = true } = {}) {
   else swap();
 }
 
-function celebrateMilestones(prev, count) {
-  return newlyUnlocked(prev, count, state.rewards).reduce(
-    (p, r) => p.then(() => showCertificate({ name: config.herName, signer: config.signedBy, reward: r.reward, at: r.at })),
-    Promise.resolve(),
-  );
+// Certificates for any reward payout up to `count` this device hasn't celebrated yet.
+async function celebrate(count) {
+  for (const cert of celebrationsFor(occurrences(state.rewards.rules, count), getCelebrated())) {
+    await showCertificate({ name: config.herName, signer: config.signedBy, at: cert.at, lines: cert.lines });
+    addCelebrated(cert.keys);
+  }
 }
 
 // Plays the reveal plan for stars [from, to): slaps, sheet stamps, page turns.
@@ -87,7 +103,7 @@ async function revealRange(from, to) {
   const last = state.stars[to - 1];
   const n = to - from;
   showNote(n === 1 ? 'New star!' : `${n} new stars!`, last.label, formatDate(last.date));
-  await celebrateMilestones(from, to);
+  await celebrate(to);
   renderAll();
   setSeen(to);
 }
@@ -113,17 +129,19 @@ function offerReveal(seen) {
 async function refresh() {
   if (state.busy || !$('envelope').hidden) return;
   let stars;
-  try { stars = await loadStars(); } catch { return; }
+  try {
+    [stars, state.rewards] = await Promise.all([loadStars(), loadRewards()]);
+  } catch { return; }
   const seen = Math.min(getSeen(), stars.length);
   const changed = stars.length !== state.stars.length || stars.some((s, i) => s.id !== state.stars[i]?.id || s.label !== state.stars[i]?.label);
   state.stars = stars;
   setSeen(seen);
-  if (unseenCount(stars.length, seen)) offerReveal(seen);
-  else if (changed) {
-    state.shown = stars.length;
-    state.sheet = Math.min(state.sheet, currentSheet(state.shown));
-    renderAll();
-  }
+  if (unseenCount(stars.length, seen)) { offerReveal(seen); return; }
+  state.shown = stars.length;
+  if (changed) state.sheet = Math.min(state.sheet, currentSheet(state.shown));
+  renderAll();
+  state.busy = true;
+  try { await celebrate(state.shown); } finally { state.busy = false; }
 }
 
 // ---------- interactions ----------
@@ -155,8 +173,19 @@ function onCouponTap(e) {
   const c = e.target.closest('.coupon.unlocked');
   if (!c) return;
   sfx.unlockAudio();
-  const r = state.rewards.find(x => x.at === Number(c.dataset.at));
-  if (r) showCertificate({ name: config.herName, signer: config.signedBy, reward: r.reward, at: r.at });
+  const redeemed = c.dataset.state === 'redeemed';
+  const done = new Set(state.rewards.redeemed);
+  const mine = occurrences(state.rewards.rules, state.shown)
+    .filter(o => o.ruleId === c.dataset.rule && done.has(o.key) === redeemed);
+  if (!mine.length) return;
+  const last = mine[mine.length - 1];
+  showCertificate({
+    name: config.herName,
+    signer: config.signedBy,
+    at: last.at,
+    lines: [{ reward: last.reward, times: mine.length }],
+    redeemed,
+  });
 }
 
 function wireSheetNav() {
@@ -281,6 +310,7 @@ function wireSecretTaps() {
 
 const admin = initAdmin({
   currentStars: () => state.stars,
+  currentRewards: () => state.rewards,
   async award(star) {
     sfx.unlockAudio();
     const prev = state.stars.length;
@@ -293,7 +323,7 @@ const admin = initAdmin({
       await runReveal(prev, prev + 1);
       renderShelf(prev + 1, state.rewards);
       showNote('Star awarded!', star.label, 'saving…', 2500);
-      await celebrateMilestones(prev, prev + 1);
+      await celebrate(prev + 1);
     } finally {
       state.busy = false;
     }
@@ -303,6 +333,12 @@ const admin = initAdmin({
     state.shown = state.stars.length;
     state.sheet = Math.min(state.sheet, currentSheet(state.shown));
     setSeen(state.stars.length);
+    renderAll();
+  },
+  commitRewards(doc) {
+    state.rewards = normalizeRewardsDoc(doc);
+    // Willie just set these up himself; don't pop certificates at him while he edits.
+    addCelebrated(occurrences(state.rewards.rules, state.shown).map(o => o.key));
     renderAll();
   },
   note: (kicker, label) => showNote(kicker, label),
@@ -322,9 +358,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 
   try {
-    const [stars, rewards] = await Promise.all([loadStars(), fetchJson(config.rewardsPath)]);
-    state.stars = stars;
-    state.rewards = normalizeRewards(rewards);
+    [state.stars, state.rewards] = await Promise.all([loadStars(), loadRewards()]);
   } catch (err) {
     console.error(err);
     showNote('Oops', 'Couldn’t load the chart. Pull to refresh?', '', 8000);
@@ -334,6 +368,11 @@ async function boot() {
   setSeen(seen);
   offerReveal(seen);
   startShine();
+  // Rewards added below her current count still deserve a certificate.
+  if (!unseenCount(state.stars.length, seen)) {
+    state.busy = true;
+    try { await celebrate(seen); } finally { state.busy = false; }
+  }
   if (location.hash === '#admin') admin.open();
 }
 
