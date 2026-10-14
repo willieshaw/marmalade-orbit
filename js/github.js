@@ -33,6 +33,38 @@ export function removeLastStar(doc) {
   return { ...doc, stars: starsOf(doc).slice(0, -1) };
 }
 
+export function editStar(doc, id, patch) {
+  const stars = starsOf(doc);
+  if (!stars.some(s => s.id === id)) throw new Error('Star not found');
+  const label = patch.label === undefined ? undefined : String(patch.label).trim();
+  if (label === '') throw new Error('A star needs a label');
+  return {
+    ...doc,
+    stars: stars.map(s => (s.id === id
+      ? { ...s, ...(label !== undefined && { label }), ...(patch.date !== undefined && { date: patch.date }) }
+      : s)),
+  };
+}
+
+export function deleteStar(doc, id) {
+  return { ...doc, stars: starsOf(doc).filter(s => s.id !== id) };
+}
+
+const redeemedOf = doc => (doc && Array.isArray(doc.redeemed) ? doc.redeemed : []);
+
+export function setRules(doc, rules) {
+  return { ...doc, rules, redeemed: redeemedOf(doc) };
+}
+
+export function markRedeemed(doc, key) {
+  const redeemed = redeemedOf(doc);
+  return { ...doc, redeemed: redeemed.includes(key) ? redeemed : [...redeemed, key] };
+}
+
+export function unmarkRedeemed(doc, key) {
+  return { ...doc, redeemed: redeemedOf(doc).filter(k => k !== key) };
+}
+
 export function serializeStars(doc) {
   return JSON.stringify(doc, null, 2) + '\n';
 }

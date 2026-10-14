@@ -110,3 +110,40 @@ test('client GETs bypass caches', async () => {
   await client.read();
   assert.equal(gh.calls[0].cache, 'no-store');
 });
+
+import { editStar, deleteStar, setRules, markRedeemed, unmarkRedeemed } from '../js/github.js';
+
+const twoStars = () => ({ stars: [
+  { id: 'a', label: 'Laundry', date: '2026-10-01' },
+  { id: 'b', label: 'Dentist', date: '2026-10-02' },
+] });
+
+test('editStar patches one star by id and trims the label', () => {
+  const doc = twoStars();
+  const out = editStar(doc, 'b', { label: '  Dentist ✔ ', date: '2026-10-03' });
+  assert.deepEqual(out.stars[1], { id: 'b', label: 'Dentist ✔', date: '2026-10-03' });
+  assert.equal(doc.stars[1].label, 'Dentist');
+});
+
+test('editStar refuses an empty label and an unknown id', () => {
+  assert.throws(() => editStar(twoStars(), 'a', { label: ' ' }), /label/i);
+  assert.throws(() => editStar(twoStars(), 'zzz', { label: 'x' }), /not found/i);
+});
+
+test('deleteStar removes by id', () => {
+  assert.deepEqual(deleteStar(twoStars(), 'a').stars.map(s => s.id), ['b']);
+  assert.deepEqual(deleteStar(twoStars(), 'zzz').stars.map(s => s.id), ['a', 'b']);
+});
+
+test('setRules replaces rules and keeps redeemed', () => {
+  const out = setRules({ rules: [], redeemed: ['d@10'] }, [{ id: 'd', kind: 'every', every: 10, reward: 'x' }]);
+  assert.equal(out.rules.length, 1);
+  assert.deepEqual(out.redeemed, ['d@10']);
+});
+
+test('markRedeemed is idempotent and unmarkRedeemed removes', () => {
+  const once = markRedeemed({ rules: [] }, 'd@10');
+  const twice = markRedeemed(once, 'd@10');
+  assert.deepEqual(twice.redeemed, ['d@10']);
+  assert.deepEqual(unmarkRedeemed(twice, 'd@10').redeemed, []);
+});

@@ -56,7 +56,7 @@
 
     <button class="logbook-btn" id="logbook-open" type="button">📖 Logbook</button>
 
-    <section class="shelf-wrap" aria-label="Rewards">
+    <section class="shelf-wrap" id="shelf-wrap" aria-label="Rewards">
       <h2 class="shelf-title">Rewards</h2>
       <ul class="shelf" id="shelf"></ul>
     </section>
@@ -108,7 +108,12 @@
       <input id="token-input" type="password" autocomplete="off" spellcheck="false" required>
       <button class="btn btn-gold" type="submit">Unlock</button>
     </form>
-    <form id="award-form" class="desk-form" hidden>
+    <div class="desk-tabs" id="desk-tabs" role="tablist" hidden>
+      <button type="button" role="tab" data-tab="award" aria-selected="true">Award</button>
+      <button type="button" role="tab" data-tab="stars" aria-selected="false">Stars</button>
+      <button type="button" role="tab" data-tab="rewards" aria-selected="false">Rewards</button>
+    </div>
+    <form id="award-form" class="desk-form desk-panel" data-panel="award" hidden>
       <label for="label-input">What did she do?</label>
       <input id="label-input" type="text" maxlength="80" placeholder="Called the dentist" required>
       <button class="btn btn-gold btn-big" type="submit">Award star ★</button>
@@ -117,6 +122,25 @@
         <button class="btn btn-plain" id="lock" type="button">Lock</button>
       </div>
     </form>
+    <div class="desk-panel" data-panel="stars" hidden>
+      <input id="star-search" class="desk-search" type="search" placeholder="Search by what she did or a date" autocomplete="off">
+      <p class="desk-hint" id="star-count"></p>
+      <ul class="desk-list" id="star-list"></ul>
+    </div>
+    <div class="desk-panel" data-panel="rewards" hidden>
+      <p class="desk-hint">One-off rewards pay out once. Repeating ones pay out every N stars.</p>
+      <ul class="desk-list" id="rule-list"></ul>
+      <div class="desk-row">
+        <button class="btn btn-plain" id="rule-add" type="button">+ Add reward</button>
+        <button class="btn btn-gold" id="rules-save" type="button">Save rewards</button>
+      </div>
+      <h3 class="desk-sub">Owed</h3>
+      <ul class="desk-list" id="owed-list"></ul>
+      <details class="desk-details">
+        <summary id="redeemed-summary">Redeemed</summary>
+        <ul class="desk-list" id="redeemed-list"></ul>
+      </details>
+    </div>
     <p class="desk-msg" id="desk-msg" role="status"></p>
   </div>
 

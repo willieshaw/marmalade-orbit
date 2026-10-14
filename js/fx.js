@@ -149,12 +149,14 @@ export function confetti(duration = 2600) {
   requestAnimationFrame(frame);
 }
 
-// Certificate with a rubber stamp. Resolves when it is closed.
-export function showCertificate({ name, signer, reward, at }) {
+// Certificate with a rubber stamp. `lines` is [{ reward, times }]. Resolves when it is closed.
+export function showCertificate({ name, signer, at, lines, redeemed = false }) {
   $('cert-name').textContent = name;
   $('cert-signer').textContent = signer;
-  $('cert-reward').textContent = reward;
+  $('cert-reward').textContent = lines.map(l => (l.times > 1 ? `${l.reward} ×${l.times}` : l.reward)).join('\n');
+  $('cert-reward').classList.toggle('multi', lines.length > 1);
   $('cert-for').textContent = `for collecting ${at} gold stars`;
+  $('stamp').textContent = redeemed ? 'REDEEMED' : 'EARNED';
   const cert = $('certificate');
   const scrim = $('scrim');
   const stamp = $('stamp');

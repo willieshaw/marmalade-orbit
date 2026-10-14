@@ -1,6 +1,6 @@
 // Renders the paper chart, the progress ruler and the reward shelf.
 
-import { milestoneProgress } from './data.js';
+import { milestoneProgress, occurrences, nextOccurrences, owed, groupByRule } from './rewards.js';
 import { sheetRange, currentSheet } from './sheets.js';
 
 const $ = id => document.getElementById(id);
@@ -50,7 +50,7 @@ export function renderChart({ stars, rewards, sheet, shown }) {
   const grid = $('grid');
   const count = stars.length;
   const { start, end } = sheetRange(sheet);
-  const milestones = new Set(rewards.map(r => r.at));
+  const milestones = new Set(occurrences(rewards.rules, end, start).map(o => o.at));
   const frag = document.createDocumentFragment();
 
   for (let i = start; i < end; i++) {
@@ -103,15 +103,15 @@ export function renderCount(count) {
   document.querySelector('.count-badge').classList.toggle('wide', count >= 100);
 }
 
-export function renderRuler(count, rewards) {
-  const p = milestoneProgress(count, rewards);
+export function renderRuler(count, { rules }) {
+  const p = milestoneProgress(count, rules);
   const text = $('ruler-text');
   text.replaceChildren();
   if (p.next) {
     const strong = document.createElement('strong');
     strong.textContent = String(p.remaining);
     text.append(strong, ` more star${p.remaining === 1 ? '' : 's'} until: ${p.next.reward}`);
-  } else if (rewards.length) {
+  } else if (rules.length) {
     text.textContent = 'Every reward unlocked. Legend status.';
   } else {
     text.textContent = 'Keep collecting!';
@@ -121,26 +121,60 @@ export function renderRuler(count, rewards) {
   $('pencil').style.left = pct;
 }
 
-export function renderShelf(count, rewards) {
-  const shelf = $('shelf');
-  shelf.replaceChildren(...rewards.map(r => {
+function coupon({ state, at, reward, count = 1, ruleId }) {
+  const unlocked = state !== 'locked';
+  const el = document.createElement(unlocked ? 'button' : 'div');
+  el.className = `coupon ${state === 'locked' ? 'locked' : 'unlocked'}${state === 'redeemed' ? ' redeemed' : ''}`;
+  if (unlocked) {
+    el.type = 'button';
+    el.dataset.rule = ruleId;
+    el.dataset.state = state;
+  }
+  const atEl = document.createElement('span');
+  atEl.className = 'coupon-at';
+  atEl.textContent = `${at}★`;
+  const txt = document.createElement('span');
+  txt.className = 'coupon-text';
+  txt.textContent = reward;
+  el.append(atEl, txt);
+  if (count > 1) {
+    const times = document.createElement('span');
+    times.className = 'coupon-times';
+    times.textContent = `×${count}`;
+    el.append(times);
+  }
+  const li = document.createElement('li');
+  li.append(el);
+  return li;
+}
+
+// Owed rewards first (bundled per rule), then the next few coming up, then a fold of redeemed ones.
+export function renderShelf(count, { rules, redeemed }) {
+  $('shelf-wrap').hidden = rules.length === 0;
+  const unlocked = occurrences(rules, count);
+  const done = new Set(redeemed);
+  const items = [
+    ...groupByRule(owed(unlocked, redeemed)).map(g =>
+      coupon({ state: 'owed', at: g.latestAt, reward: g.reward, count: g.count, ruleId: g.ruleId })),
+    ...nextOccurrences(rules, count, 3).map(o => coupon({ state: 'locked', at: o.at, reward: o.reward })),
+  ];
+  const redeemedGroups = groupByRule(unlocked.filter(o => done.has(o.key)));
+  if (redeemedGroups.length) {
+    const total = redeemedGroups.reduce((n, g) => n + g.count, 0);
+    const details = document.createElement('details');
+    details.className = 'shelf-redeemed';
+    const summary = document.createElement('summary');
+    summary.textContent = `${total} redeemed`;
+    const ul = document.createElement('ul');
+    ul.className = 'shelf';
+    ul.append(...redeemedGroups.map(g =>
+      coupon({ state: 'redeemed', at: g.latestAt, reward: g.reward, count: g.count, ruleId: g.ruleId })));
+    details.append(summary, ul);
     const li = document.createElement('li');
-    const el = document.createElement(r.at <= count ? 'button' : 'div');
-    el.className = `coupon ${r.at <= count ? 'unlocked' : 'locked'}`;
-    if (r.at <= count) {
-      el.type = 'button';
-      el.dataset.at = String(r.at);
-    }
-    const at = document.createElement('span');
-    at.className = 'coupon-at';
-    at.textContent = `${r.at}★`;
-    const txt = document.createElement('span');
-    txt.className = 'coupon-text';
-    txt.textContent = r.reward;
-    el.append(at, txt);
-    li.append(el);
-    return li;
-  }));
+    li.append(details);
+    items.push(li);
+  }
+  $('shelf').replaceChildren(...items);
 }
 
 export function slotEl(index) {

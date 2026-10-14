@@ -10,8 +10,11 @@ The chart is a pad of paper with 50 spaces per sheet. A full sheet gets a COMPLE
 
 1. On your phone, open the site and **tap the title 5 times fast** (or add `#admin` to the URL). The Teacher's desk slides up.
 2. First time only: paste a GitHub token and tap **Unlock**. It is checked against the repo and stored only in that phone's browser.
-3. Type what she did, tap **Award star ★**. It is committed to `data/stars.json`. Grace sees it about a minute later, once Pages rebuilds.
-4. **Undo last star** removes the newest star. **Lock** forgets the token on that phone.
+3. **Award** tab: type what she did, tap **Award star ★**. It is committed to `data/stars.json`. Grace sees it about a minute later, once Pages rebuilds. **Undo last star** removes the newest one; **Lock** forgets the token on that phone.
+4. **Stars** tab: search every star, fix a label or date, or delete one.
+5. **Rewards** tab: add rewards that pay out **once** ("Once at 100 stars: weekend trip") or **repeat** ("Every 10 stars: dessert of her choice"), then **Save rewards**. Below that, the **Owed** list lets you mark a reward redeemed once she's had it (and undo).
+
+Rewards live in `data/rewards.json` as `rules` plus a `redeemed` list of payouts (`"<ruleId>@<stars>"`). Each payout shows Grace a certificate once per device; three or more at once are bundled onto one certificate.
 
 ### Making the token
 
