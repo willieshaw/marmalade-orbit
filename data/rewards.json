@@ -1,0 +1,5 @@
+[
+  { "at": 5, "reward": "TODO: reward for 5 stars" },
+  { "at": 10, "reward": "TODO: reward for 10 stars" },
+  { "at": 25, "reward": "TODO: reward for 25 stars" }
+]
