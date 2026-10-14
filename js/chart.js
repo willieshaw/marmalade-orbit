@@ -1,6 +1,7 @@
 // Renders the paper chart, the progress ruler and the reward shelf.
 
 import { milestoneProgress } from './data.js';
+import { sheetRange, currentSheet } from './sheets.js';
 
 const $ = id => document.getElementById(id);
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -37,7 +38,6 @@ function sticker(star, index) {
   btn.className = 'sticker';
   btn.dataset.index = String(index);
   btn.style.setProperty('--rot', `${Math.round((hash01(star.id) - .5) * 30)}deg`);
-  btn.style.setProperty('--sheen-delay', `${(index * .37) % 7}s`);
   btn.setAttribute('aria-label', `Star ${index + 1}: ${star.label}`);
   const sheen = document.createElement('span');
   sheen.className = 'sheen';
@@ -45,19 +45,15 @@ function sticker(star, index) {
   return btn;
 }
 
-function slotCount(count, rewards) {
-  const next = rewards.find(r => r.at > count);
-  return Math.max(10, count + 1, next ? next.at : 0);
-}
-
-export function renderChart({ stars, rewards, pending = 0 }) {
+// Renders one sheet of the pad. Stars at index >= `shown` are hidden until a reveal slaps them on.
+export function renderChart({ stars, rewards, sheet, shown }) {
   const grid = $('grid');
   const count = stars.length;
+  const { start, end } = sheetRange(sheet);
   const milestones = new Set(rewards.map(r => r.at));
-  const total = slotCount(count, rewards);
   const frag = document.createDocumentFragment();
 
-  for (let i = 0; i < total; i++) {
+  for (let i = start; i < end; i++) {
     const li = document.createElement('li');
     li.className = 'slot';
     li.dataset.index = String(i);
@@ -68,25 +64,43 @@ export function renderChart({ stars, rewards, pending = 0 }) {
     li.append(num);
     if (i < count) {
       li.classList.add('filled');
-      // The last `pending` stars are hidden until the reveal animation slaps them on.
-      if (i >= count - pending) li.classList.add('pending');
+      if (i >= shown) li.classList.add('pending');
       li.append(sticker(stars[i], i));
     } else {
       li.classList.add('empty');
-      if (i === count) li.classList.add('next');
+      if (i === count && shown === count) li.classList.add('next');
     }
     frag.append(li);
   }
   grid.replaceChildren(frag);
 
+  renderPad({ sheet, shown });
   $('empty-hint').hidden = count > 0;
-  renderCount(count - pending);
-  renderRuler(count - pending, rewards);
-  renderShelf(count - pending, rewards);
+  renderCount(shown);
+  renderRuler(shown, rewards);
+  renderShelf(shown, rewards);
+}
+
+// Sheet label, nav arrows, COMPLETE stamp and the stack of filled sheets underneath.
+export function renderPad({ sheet, shown }) {
+  const { start, end } = sheetRange(sheet);
+  const top = currentSheet(shown);
+  $('sheet-label').textContent = `Sheet ${sheet + 1} · stars ${start + 1}–${end}`;
+  $('sheet-prev').disabled = sheet === 0;
+  $('sheet-next').disabled = sheet >= top;
+  $('sheet-stamp').hidden = shown < end;
+  const layers = Math.min(5, top);
+  const shadows = Array.from({ length: layers }, (_, k) => {
+    const n = k + 1;
+    const x = (n % 2 ? 1 : -1) * n * 1.5;
+    return `${x}px ${n * 4}px 0 -1px ${n % 2 ? '#f3ecd8' : '#ebe2c8'}, ${x}px ${n * 4 + 1}px 0 -1px rgba(120, 90, 50, .35)`;
+  });
+  $('paper').style.setProperty('--pad', shadows.length ? `${shadows.join(', ')},` : '');
 }
 
 export function renderCount(count) {
   $('count').textContent = String(count);
+  document.querySelector('.count-badge').classList.toggle('wide', count >= 100);
 }
 
 export function renderRuler(count, rewards) {

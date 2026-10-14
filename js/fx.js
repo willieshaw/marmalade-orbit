@@ -190,3 +190,53 @@ function shakeEl(el) {
     { translate: '0 0' }, { translate: '-3px 2px' }, { translate: '3px -1px' }, { translate: '0 0' },
   ], { duration: 220 });
 }
+
+// Turn the pad: the sheet lifts away, `swap()` re-renders, the new sheet settles in.
+export async function turnPage(direction, swap) {
+  const paper = $('paper');
+  if (reducedMotion()) { swap(); return; }
+  sfx.flip();
+  const lift = direction > 0
+    ? 'translate(-40%, -30px) rotate(-12deg)'
+    : 'translate(40%, -30px) rotate(12deg)';
+  await paper.animate(
+    [{ transform: 'rotate(.6deg)', opacity: 1 }, { transform: lift, opacity: 0 }],
+    { duration: 240, easing: 'cubic-bezier(.5, 0, .9, .5)' },
+  ).finished;
+  swap();
+  const from = direction > 0
+    ? 'translate(20%, 16px) rotate(5deg)'
+    : 'translate(-20%, 16px) rotate(-5deg)';
+  await paper.animate(
+    [{ transform: from, opacity: 0 }, { transform: 'rotate(.6deg)', opacity: 1 }],
+    { duration: 320, easing: 'cubic-bezier(.3, 1.4, .5, 1)' },
+  ).finished;
+}
+
+// A sheet just filled up: COMPLETE stamp, fanfare, confetti.
+export async function sheetComplete() {
+  const stamp = $('sheet-stamp');
+  stamp.hidden = false;
+  stamp.classList.remove('thump');
+  void stamp.offsetWidth;
+  stamp.classList.add('thump');
+  sfx.fanfare();
+  await wait(reducedMotion() ? 300 : 380);
+  sfx.stampThump();
+  shake();
+  confetti(2200);
+  await wait(reducedMotion() ? 600 : 1500);
+}
+
+// Every so often one random sticker catches the light. One sheen at a time keeps phones cool.
+export function startShine(intervalMs = 1300) {
+  if (reducedMotion()) return;
+  setInterval(() => {
+    if (document.hidden) return;
+    const stickers = document.querySelectorAll('.slot:not(.pending) .sticker:not(.shine)');
+    if (!stickers.length) return;
+    const el = stickers[Math.floor(Math.random() * stickers.length)];
+    el.classList.add('shine');
+    el.addEventListener('animationend', () => el.classList.remove('shine'), { once: true });
+  }, intervalMs);
+}
