@@ -96,3 +96,10 @@ export function stampThump() {
   noise({ dur: .05, gain: .6, freq: 900 });
   tone({ type: 'sine', from: 110, to: 40, dur: .16, gain: .6 });
 }
+
+// Paper page turning.
+export function flip() {
+  if (!ready()) return;
+  noise({ dur: .18, gain: .35, freq: 3200 });
+  noise({ at: .07, dur: .1, gain: .2, freq: 1400 });
+}

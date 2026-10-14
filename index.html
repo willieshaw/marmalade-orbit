@@ -39,8 +39,14 @@
     <section class="paper" id="paper" aria-label="Star chart">
       <span class="tape tape-l" aria-hidden="true"></span>
       <span class="tape tape-r" aria-hidden="true"></span>
+      <div class="sheet-head">
+        <button class="sheet-nav" id="sheet-prev" type="button" aria-label="Previous sheet">‹</button>
+        <p class="sheet-label" id="sheet-label" aria-live="polite"></p>
+        <button class="sheet-nav" id="sheet-next" type="button" aria-label="Next sheet">›</button>
+      </div>
       <ol class="grid" id="grid"></ol>
       <p class="empty-hint" id="empty-hint" hidden>Your first star is waiting&hellip;</p>
+      <div class="sheet-stamp" id="sheet-stamp" hidden>COMPLETE</div>
     </section>
 
     <section class="ruler-wrap" aria-label="Next reward">
@@ -48,11 +54,22 @@
       <div class="ruler" aria-hidden="true"><div class="ruler-fill" id="ruler-fill"></div><div class="pencil" id="pencil">✏️</div></div>
     </section>
 
+    <button class="logbook-btn" id="logbook-open" type="button">📖 Logbook</button>
+
     <section class="shelf-wrap" aria-label="Rewards">
       <h2 class="shelf-title">Rewards</h2>
       <ul class="shelf" id="shelf"></ul>
     </section>
   </main>
+
+  <section class="logbook" id="logbook" role="dialog" aria-modal="true" aria-labelledby="logbook-title" hidden>
+    <div class="logbook-head">
+      <h2 id="logbook-title">Logbook</h2>
+      <button class="desk-x" id="logbook-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <p class="logbook-sub" id="logbook-sub"></p>
+    <div class="logbook-body" id="logbook-body"></div>
+  </section>
 
   <div class="note" id="note" role="status" hidden>
     <p class="note-kicker" id="note-kicker"></p>

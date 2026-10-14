@@ -4,6 +4,8 @@ Grace's gold-star sticker chart. Static site on GitHub Pages: https://willieshaw
 
 Every finished task earns a big foil star. When she opens the site and there are stars she hasn't seen, they slap onto the chart one by one. Reward thresholds bring up a stamped certificate.
 
+The chart is a pad of paper with 50 spaces per sheet. A full sheet gets a COMPLETE stamp and the pad turns to a fresh one; swipe or use ‹ › to look back through old sheets. The 📖 Logbook lists every star by month; tapping a line jumps to that star.
+
 ## Awarding a star (Willie only)
 
 1. On your phone, open the site and **tap the title 5 times fast** (or add `#admin` to the URL). The Teacher's desk slides up.
