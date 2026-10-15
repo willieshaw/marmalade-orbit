@@ -174,3 +174,24 @@ test('client.read still throws on a missing file', async () => {
   const client = createClient({ ...repo, fetch });
   await assert.rejects(client.read(), err => err.status === 404);
 });
+
+import { makeStars, appendStars } from '../js/github.js';
+
+test('makeStars turns each non-blank label into its own star with a unique id', () => {
+  const now = new Date(2026, 9, 15, 9, 0);
+  const stars = makeStars({ labels: [' Dishes ', '', 'Laundry', '   ', 'Gym'], now });
+  assert.deepEqual(stars.map(s => s.label), ['Dishes', 'Laundry', 'Gym']);
+  assert.ok(stars.every(s => s.date === '2026-10-15'));
+  assert.equal(new Set(stars.map(s => s.id)).size, 3);
+});
+
+test('makeStars needs at least one label', () => {
+  assert.throws(() => makeStars({ labels: ['', '  '] }), /label/i);
+});
+
+test('appendStars adds several stars in order without mutating', () => {
+  const doc = { stars: [{ id: 'a', label: 'x', date: 'd' }] };
+  const out = appendStars(doc, [{ id: 'b', label: 'y', date: 'd' }, { id: 'c', label: 'z', date: 'd' }]);
+  assert.deepEqual(out.stars.map(s => s.id), ['a', 'b', 'c']);
+  assert.equal(doc.stars.length, 1);
+});
