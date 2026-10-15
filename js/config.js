@@ -5,4 +5,5 @@ export const config = {
   repo: 'marmalade-orbit',
   starsPath: 'data/stars.json',
   rewardsPath: 'data/rewards.json',
+  keyPath: 'data/key.json',
 };

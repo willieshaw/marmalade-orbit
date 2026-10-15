@@ -103,10 +103,18 @@
       <h2>Teacher&rsquo;s desk</h2>
       <button class="desk-x" id="desk-close" type="button" aria-label="Close">✕</button>
     </div>
+    <form id="password-form" class="desk-form" hidden>
+      <input type="text" name="username" value="stars-admin" autocomplete="username" hidden>
+      <label for="password-input">Password</label>
+      <input id="password-input" type="password" autocomplete="current-password" spellcheck="false" required>
+      <button class="btn btn-gold" type="submit">Unlock</button>
+      <button class="btn btn-plain" id="use-token" type="button">Use a GitHub token instead</button>
+    </form>
     <form id="token-form" class="desk-form" hidden>
       <label for="token-input">GitHub token (stays on this phone)</label>
       <input id="token-input" type="password" autocomplete="off" spellcheck="false" required>
       <button class="btn btn-gold" type="submit">Unlock</button>
+      <button class="btn btn-plain" id="use-password" type="button" hidden>Use my password instead</button>
     </form>
     <div class="desk-tabs" id="desk-tabs" role="tablist" hidden>
       <button type="button" role="tab" data-tab="award" aria-selected="true">Award</button>
@@ -119,8 +127,18 @@
       <button class="btn btn-gold btn-big" type="submit">Award star ★</button>
       <div class="desk-row">
         <button class="btn btn-plain" id="undo" type="button">Undo last star</button>
+        <button class="btn btn-plain" id="set-password-toggle" type="button">Set password</button>
         <button class="btn btn-plain" id="lock" type="button">Lock</button>
       </div>
+    </form>
+    <form id="set-password-form" class="desk-form desk-subform" hidden>
+      <input type="text" name="username" value="stars-admin" autocomplete="username" hidden>
+      <p class="desk-hint">Pick a password you’ll remember. It unlocks this desk on any device. At least 12 characters; a few random words works well.</p>
+      <label for="new-password">New password</label>
+      <input id="new-password" type="password" autocomplete="new-password" spellcheck="false" required>
+      <label for="new-password-2">Same again</label>
+      <input id="new-password-2" type="password" autocomplete="new-password" spellcheck="false" required>
+      <button class="btn btn-gold" type="submit">Save password</button>
     </form>
     <div class="desk-panel" data-panel="stars" hidden>
       <input id="star-search" class="desk-search" type="search" placeholder="Search by what she did or a date" autocomplete="off">

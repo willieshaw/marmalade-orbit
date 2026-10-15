@@ -8,6 +8,7 @@ import {
   setRules, markRedeemed, unmarkRedeemed,
 } from './github.js';
 import { normalizeRewardsDoc, occurrences, owed, groupByRule, validateRules } from './rewards.js';
+import { encryptToken, decryptToken, passwordProblem } from './vault.js';
 
 const TOKEN_KEY = 'mo.token';
 const MAX_STAR_ROWS = 100;
@@ -22,6 +23,7 @@ function clientsFor(token) {
   return {
     stars: createClient({ ...base, path: config.starsPath }),
     rewards: createClient({ ...base, path: config.rewardsPath }),
+    key: createClient({ ...base, path: config.keyPath }),
   };
 }
 
@@ -38,6 +40,16 @@ const el = (tag, { dataset, ...props } = {}, ...children) => {
   node.append(...children);
   return node;
 };
+
+// The encrypted token, if Willie has set a password. Public, so no token is needed to read it.
+async function fetchKeyRecord() {
+  try {
+    const res = await fetch(`${config.keyPath}?t=${Date.now()}`, { cache: 'no-store' });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
 
 const newRuleId = () => 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
@@ -58,6 +70,10 @@ export function initAdmin(hooks) {
   let clients = storedToken() ? clientsFor(storedToken()) : null;
   let tab = 'award';
   let draft = [];
+  let keyRecord = null;
+  let preferToken = false;
+  const passwordForm = $('password-form');
+  const setPasswordForm = $('set-password-form');
 
   const say = (text, isError = false) => {
     msg.textContent = text;
@@ -74,16 +90,26 @@ export function initAdmin(hooks) {
   }
 
   function showForms() {
-    tokenForm.hidden = !!clients;
+    const usePassword = !clients && keyRecord && !preferToken;
+    passwordForm.hidden = !usePassword;
+    tokenForm.hidden = !!clients || usePassword;
+    $('use-password').hidden = !keyRecord;
     tabs.hidden = !clients;
+    setPasswordForm.hidden = true;
+    $('set-password-toggle').textContent = keyRecord ? 'Change password' : 'Set password';
     showTab(tab);
   }
 
-  function open() {
+  async function open() {
     showForms();
     desk.hidden = false;
-    if (!clients) $('token-input').focus();
-    else if (tab === 'award') $('label-input').focus();
+    if (!clients) {
+      keyRecord = await fetchKeyRecord();
+      showForms();
+      (keyRecord && !preferToken ? $('password-input') : $('token-input')).focus();
+    } else if (tab === 'award') {
+      $('label-input').focus();
+    }
   }
 
   function close() {
@@ -121,25 +147,81 @@ export function initAdmin(hooks) {
 
   // ---------- unlock ----------
 
-  tokenForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    const token = $('token-input').value.trim();
-    if (!token) return;
+  // Turn a token into an unlocked desk, after checking GitHub accepts it.
+  async function unlockWith(token, rejectedText) {
     const candidate = clientsFor(token);
-    say('Checking…');
     try {
       await candidate.stars.read();
     } catch (err) {
-      say(friendly(err), true);
-      return;
+      say(err.status === 401 && rejectedText ? rejectedText : friendly(err), true);
+      return false;
     }
     try { localStorage.setItem(TOKEN_KEY, token); } catch {}
-    $('token-input').value = '';
     clients = candidate;
     tab = 'award';
     showForms();
     say('Unlocked. Go hand out some stars.');
     $('label-input').focus();
+    return true;
+  }
+
+  $('use-token').addEventListener('click', () => { preferToken = true; showForms(); say(''); $('token-input').focus(); });
+  $('use-password').addEventListener('click', () => { preferToken = false; showForms(); say(''); $('password-input').focus(); });
+
+  passwordForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const button = passwordForm.querySelector('button[type=submit]');
+    button.disabled = true;
+    say('Checking…');
+    try {
+      const token = await decryptToken(keyRecord, $('password-input').value);
+      if (await unlockWith(token, 'Password is right, but GitHub rejected the saved token. It may have expired: unlock with a new token, then set your password again.')) {
+        $('password-input').value = '';
+      }
+    } catch (err) {
+      say(err.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $('set-password-toggle').addEventListener('click', () => {
+    setPasswordForm.hidden = !setPasswordForm.hidden;
+    if (!setPasswordForm.hidden) $('new-password').focus();
+  });
+
+  setPasswordForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const pw = $('new-password').value;
+    if (pw !== $('new-password-2').value) { say('Those two passwords don’t match.', true); return; }
+    const problem = passwordProblem(pw);
+    if (problem) { say(problem, true); return; }
+    const button = setPasswordForm.querySelector('button[type=submit]');
+    button.disabled = true;
+    say('Locking the token with your password…');
+    try {
+      const record = await encryptToken(storedToken(), pw);
+      const ok = await save(async () => {
+        await clients.key.update(() => record, 'Set desk password');
+      }, 'Password saved. Use it to unlock on any device (new devices pick it up in about a minute).');
+      if (ok) {
+        keyRecord = record;
+        $('new-password').value = '';
+        $('new-password-2').value = '';
+        setPasswordForm.hidden = true;
+        $('set-password-toggle').textContent = 'Change password';
+      }
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  tokenForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const token = $('token-input').value.trim();
+    if (!token) return;
+    say('Checking…');
+    if (await unlockWith(token)) $('token-input').value = '';
   });
 
   // ---------- award ----------

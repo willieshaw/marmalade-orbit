@@ -147,3 +147,30 @@ test('markRedeemed is idempotent and unmarkRedeemed removes', () => {
   assert.deepEqual(twice.redeemed, ['d@10']);
   assert.deepEqual(unmarkRedeemed(twice, 'd@10').redeemed, []);
 });
+
+test('client.update creates the file when it does not exist yet', async () => {
+  const calls = [];
+  let created = null;
+  const fetch = async (url, opts = {}) => {
+    calls.push(opts.method || 'GET');
+    if ((opts.method || 'GET') === 'GET') {
+      if (!created) return { ok: false, status: 404, json: async () => ({ message: 'Not Found' }) };
+      return { ok: true, status: 200, json: async () => ({ sha: 'k1', content: encodeBase64Utf8(serializeStars(created)) }) };
+    }
+    const body = JSON.parse(opts.body);
+    assert.equal(body.sha, undefined);
+    created = JSON.parse(decodeBase64Utf8(body.content));
+    return { ok: true, status: 201, json: async () => ({}) };
+  };
+  const client = createClient({ ...repo, path: 'data/key.json', fetch });
+  const out = await client.update(doc => ({ ...(doc || {}), v: 1 }), 'Set password');
+  assert.deepEqual(out, { v: 1 });
+  assert.deepEqual(created, { v: 1 });
+  assert.deepEqual(calls, ['GET', 'PUT']);
+});
+
+test('client.read still throws on a missing file', async () => {
+  const fetch = async () => ({ ok: false, status: 404, json: async () => ({ message: 'Not Found' }) });
+  const client = createClient({ ...repo, fetch });
+  await assert.rejects(client.read(), err => err.status === 404);
+});
