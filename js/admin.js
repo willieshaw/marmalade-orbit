@@ -4,7 +4,7 @@
 
 import { config } from './config.js';
 import {
-  createClient, makeStar, appendStar, removeLastStar, editStar, deleteStar,
+  createClient, makeStars, appendStars, removeLastStar, editStar, deleteStar,
   setRules, markRedeemed, unmarkRedeemed,
 } from './github.js';
 import { normalizeRewardsDoc, occurrences, owed, groupByRule, validateRules } from './rewards.js';
@@ -100,20 +100,27 @@ export function initAdmin(hooks) {
     showTab(tab);
   }
 
+  // The floating "+★" button: only on an unlocked device, and only while the desk is closed.
+  function updateFab() {
+    $('fab').hidden = !clients || !desk.hidden;
+  }
+
   async function open() {
     showForms();
     desk.hidden = false;
+    updateFab();
     if (!clients) {
       keyRecord = await fetchKeyRecord();
       showForms();
       (keyRecord && !preferToken ? $('password-input') : $('token-input')).focus();
     } else if (tab === 'award') {
-      $('label-input').focus();
+      focusAward();
     }
   }
 
   function close() {
     desk.hidden = true;
+    updateFab();
     if (location.hash === '#admin') history.replaceState(null, '', location.pathname + location.search);
   }
 
@@ -121,6 +128,7 @@ export function initAdmin(hooks) {
     try { localStorage.removeItem(TOKEN_KEY); } catch {}
     clients = null;
     showForms();
+    updateFab();
     say('Locked. The token is gone from this phone.');
   }
 
@@ -161,7 +169,7 @@ export function initAdmin(hooks) {
     tab = 'award';
     showForms();
     say('Unlocked. Go hand out some stars.');
-    $('label-input').focus();
+    focusAward();
     return true;
   }
 
@@ -227,33 +235,96 @@ export function initAdmin(hooks) {
   // ---------- award ----------
 
   const awardForm = $('award-form');
+  const awardRows = $('award-rows');
+  const awardInputs = () => [...awardRows.querySelectorAll('input')];
+
+  function paintAwardButton() {
+    const n = awardInputs().filter(i => i.value.trim()).length;
+    $('award-submit').textContent = n > 1 ? `Award ${n} stars ★` : 'Award star ★';
+    awardRows.querySelectorAll('.desk-x').forEach(b => { b.hidden = awardInputs().length === 1; });
+  }
+
+  function addAwardRow(value = '') {
+    const first = !awardRows.children.length;
+    const input = el('input', {
+      type: 'text', maxLength: 80, value,
+      placeholder: first ? 'Called the dentist' : 'Something else she did',
+      ariaLabel: 'What she did',
+      enterKeyHint: 'next',
+    });
+    if (first) input.id = 'label-input';
+    const remove = el('button', { className: 'desk-x', type: 'button', textContent: '✕', ariaLabel: 'Remove this star' });
+    awardRows.append(el('li', { className: 'award-row' }, input, remove));
+    paintAwardButton();
+    return input;
+  }
+
+  function resetAwardRows(labels = ['']) {
+    awardRows.replaceChildren();
+    labels.forEach(l => addAwardRow(l));
+  }
+
+  function focusAward() {
+    const inputs = awardInputs();
+    (inputs.find(i => !i.value) || inputs[0]).focus();
+  }
+
+  resetAwardRows();
+  $('award-add').addEventListener('click', () => addAwardRow().focus());
+  awardRows.addEventListener('input', paintAwardButton);
+  awardRows.addEventListener('click', e => {
+    const b = e.target.closest('.desk-x');
+    if (!b) return;
+    b.closest('.award-row').remove();
+    paintAwardButton();
+    focusAward();
+  });
+  // Enter in the last filled row adds a new row instead of submitting; Enter on an empty row submits.
+  awardRows.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !e.target.value.trim()) return;
+    if (e.target === awardInputs().at(-1)) {
+      e.preventDefault();
+      addAwardRow().focus();
+    }
+  });
+
+  $('fab').addEventListener('click', () => {
+    tab = 'award';
+    open();
+  });
+
   awardForm.addEventListener('submit', async e => {
     e.preventDefault();
-    let star;
+    let stars;
     try {
-      star = makeStar({ label: $('label-input').value });
+      stars = makeStars({ labels: awardInputs().map(i => i.value) });
     } catch {
       say('Write what she did first.', true);
       return;
     }
     const before = hooks.currentStars();
-    const button = awardForm.querySelector('button[type=submit]');
+    const button = $('award-submit');
     button.disabled = true;
-    $('label-input').value = '';
+    resetAwardRows();
     close();
 
-    const saving = clients.stars.update(doc => appendStar(doc, star), `Star: ${star.label}`);
+    const message = stars.length === 1
+      ? `Star: ${stars[0].label}`
+      : `Stars (${stars.length}): ${stars.map(s => s.label).join(', ')}`;
+    const saving = clients.stars.update(doc => appendStars(doc, stars), message);
     saving.catch(() => {}); // handled below, after the animation
-    await hooks.award(star);
+    await hooks.award(stars);
     try {
       const saved = await saving;
       hooks.commit(saved.stars);
-      hooks.note('Saved!', `${config.herName} will see it in about a minute.`);
+      hooks.note('Saved!', `${config.herName} will see ${stars.length === 1 ? 'it' : 'them'} in about a minute.`);
     } catch (err) {
       hooks.commit(before);
       if (err.status === 401) lock();
-      open();
-      $('label-input').value = star.label;
+      tab = 'award';
+      await open();
+      resetAwardRows(stars.map(s => s.label));
+      paintAwardButton();
       say(friendly(err), true);
     } finally {
       button.disabled = false;
@@ -431,6 +502,8 @@ export function initAdmin(hooks) {
     const b = e.target.closest('button[data-act=unredeem]');
     if (b) changeRedeemed(b.dataset.rule, false);
   });
+
+  updateFab();
 
   return {
     open,

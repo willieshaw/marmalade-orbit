@@ -23,10 +23,24 @@ export function makeStar({ label, now = new Date() }) {
   return { id, label: clean, date: localDate(now) };
 }
 
+// Several stars at once, one per non-blank label, all dated now.
+export function makeStars({ labels, now = new Date() }) {
+  const clean = (labels || []).map(l => (l || '').trim()).filter(Boolean);
+  if (!clean.length) throw new Error('A star needs a label');
+  return clean.map((label, i) => {
+    const star = makeStar({ label, now });
+    return { ...star, id: `${star.id}${i.toString(36)}` };
+  });
+}
+
 const starsOf = doc => (doc && Array.isArray(doc.stars) ? doc.stars : []);
 
 export function appendStar(doc, star) {
   return { ...doc, stars: [...starsOf(doc), star] };
+}
+
+export function appendStars(doc, stars) {
+  return { ...doc, stars: [...starsOf(doc), ...stars] };
 }
 
 export function removeLastStar(doc) {

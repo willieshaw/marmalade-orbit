@@ -123,8 +123,9 @@
     </div>
     <form id="award-form" class="desk-form desk-panel" data-panel="award" hidden>
       <label for="label-input">What did she do?</label>
-      <input id="label-input" type="text" maxlength="80" placeholder="Called the dentist" required>
-      <button class="btn btn-gold btn-big" type="submit">Award star ★</button>
+      <ol class="award-rows" id="award-rows"></ol>
+      <button class="btn btn-plain award-add" id="award-add" type="button">+ Add another</button>
+      <button class="btn btn-gold btn-big" id="award-submit" type="submit">Award star ★</button>
       <div class="desk-row">
         <button class="btn btn-plain" id="undo" type="button">Undo last star</button>
         <button class="btn btn-plain" id="set-password-toggle" type="button">Set password</button>
@@ -161,6 +162,8 @@
     </div>
     <p class="desk-msg" id="desk-msg" role="status"></p>
   </div>
+
+  <button class="fab" id="fab" type="button" aria-label="Award a star" hidden><span>+</span>★</button>
 
   <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
   <script type="module" src="js/main.js"></script>

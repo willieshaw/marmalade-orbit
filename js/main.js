@@ -311,19 +311,21 @@ function wireSecretTaps() {
 const admin = initAdmin({
   currentStars: () => state.stars,
   currentRewards: () => state.rewards,
-  async award(star) {
+  async award(stars) {
     sfx.unlockAudio();
     const prev = state.stars.length;
-    state.stars = [...state.stars, star];
+    const to = prev + stars.length;
+    state.stars = [...state.stars, ...stars];
     state.shown = prev;
     state.busy = true;
     try {
       if (state.sheet !== currentSheet(prev)) await goToSheet(currentSheet(prev));
       renderAll();
-      await runReveal(prev, prev + 1);
-      renderShelf(prev + 1, state.rewards);
-      showNote('Star awarded!', star.label, 'saving…', 2500);
-      await celebrate(prev + 1);
+      await runReveal(prev, to);
+      renderShelf(to, state.rewards);
+      const last = stars[stars.length - 1];
+      showNote(stars.length === 1 ? 'Star awarded!' : `${stars.length} stars awarded!`, last.label, 'saving…', 2500);
+      await celebrate(to);
     } finally {
       state.busy = false;
     }

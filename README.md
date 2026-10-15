@@ -10,7 +10,7 @@ The chart is a pad of paper with 50 spaces per sheet. A full sheet gets a COMPLE
 
 1. On your phone, open the site and **tap the title 5 times fast** (or add `#admin` to the URL). The Teacher's desk slides up.
 2. Type your password and tap **Unlock**. (Before a password is set, or via "Use a GitHub token instead", paste the token.) The unlocked token is kept only in that browser.
-3. **Award** tab: type what she did, tap **Award star ★**. It is committed to `data/stars.json`. Grace sees it about a minute later, once Pages rebuilds. **Undo last star** removes the newest one; **Lock** forgets the token on that phone.
+3. **Award** tab: type what she did, tap **Award star ★**. For several at once, tap **+ Add another** (or press Enter) to add rows; each row is its own star and they're saved together. Once unlocked, a gold **+★** button in the corner reopens the desk any time. It is committed to `data/stars.json`. Grace sees it about a minute later, once Pages rebuilds. **Undo last star** removes the newest one; **Lock** forgets the token on that phone.
 4. **Stars** tab: search every star, fix a label or date, or delete one.
 5. **Rewards** tab: add rewards that pay out **once** ("Once at 100 stars: weekend trip") or **repeat** ("Every 10 stars: dessert of her choice"), then **Save rewards**. Below that, the **Owed** list lets you mark a reward redeemed once she's had it (and undo).
 
