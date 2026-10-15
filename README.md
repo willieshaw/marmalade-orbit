@@ -9,12 +9,16 @@ The chart is a pad of paper with 50 spaces per sheet. A full sheet gets a COMPLE
 ## Awarding a star (Willie only)
 
 1. On your phone, open the site and **tap the title 5 times fast** (or add `#admin` to the URL). The Teacher's desk slides up.
-2. First time only: paste a GitHub token and tap **Unlock**. It is checked against the repo and stored only in that phone's browser.
+2. Type your password and tap **Unlock**. (Before a password is set, or via "Use a GitHub token instead", paste the token.) The unlocked token is kept only in that browser.
 3. **Award** tab: type what she did, tap **Award star ★**. It is committed to `data/stars.json`. Grace sees it about a minute later, once Pages rebuilds. **Undo last star** removes the newest one; **Lock** forgets the token on that phone.
 4. **Stars** tab: search every star, fix a label or date, or delete one.
 5. **Rewards** tab: add rewards that pay out **once** ("Once at 100 stars: weekend trip") or **repeat** ("Every 10 stars: dessert of her choice"), then **Save rewards**. Below that, the **Owed** list lets you mark a reward redeemed once she's had it (and undo).
 
 Rewards live in `data/rewards.json` as `rules` plus a `redeemed` list of payouts (`"<ruleId>@<stars>"`). Each payout shows Grace a certificate once per device; three or more at once are bundled onto one certificate.
+
+### Password
+
+Once unlocked, **Award → Set password** encrypts the token with a password you choose (at least 12 characters; a few random words works well) and saves it to `data/key.json`. Any device can then unlock with just the password. The file is public but holds only the encrypted token (PBKDF2-SHA256, 600k iterations, AES-GCM), so a long password is what keeps it safe. When the token expires, unlock with a new token and set the password again.
 
 ### Making the token
 

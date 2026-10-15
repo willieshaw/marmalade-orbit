@@ -101,10 +101,20 @@ export function createClient({ owner, repo, path, token, fetch = globalThis.fetc
     if (!res.ok) throw await fail(res);
   }
 
+  // Like read(), but a missing file comes back as { doc: null } so update() can create it.
+  async function readOrNull() {
+    try {
+      return await read();
+    } catch (err) {
+      if (err.status === 404) return { doc: null, sha: undefined };
+      throw err;
+    }
+  }
+
   // Read-modify-write; a stale sha (someone else wrote first) gets one retry.
   async function update(mutate, message) {
     for (let attempt = 0; ; attempt++) {
-      const { doc, sha } = await read();
+      const { doc, sha } = await readOrNull();
       const next = mutate(doc);
       try {
         await write(next, sha, message);

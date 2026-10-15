@@ -683,7 +683,8 @@ body {
   background: #fff;
 }
 .desk-form input:focus { outline: none; border-color: var(--gold); }
-.desk-row { display: flex; justify-content: space-between; }
+.desk-row { display: flex; justify-content: space-between; flex-wrap: wrap; }
+.desk-subform { margin-top: 10px; padding: 12px; background: #fff; border: 2px solid #efe4c8; border-radius: 12px; }
 .desk-msg { min-height: 1.2em; margin: 8px 0 0; font-family: var(--hand); font-size: 1.1rem; color: var(--ink-soft); }
 .desk-msg.error { color: var(--marker); }
 
