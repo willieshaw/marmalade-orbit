@@ -28,6 +28,35 @@ github.com → Settings → Developer settings → Fine-grained personal access 
 - Permissions: **Contents → Read and write**
 - Pick an expiry you're happy with. When it expires the desk asks for a new one.
 
+## Texting a star (Duet or Instinct)
+
+Text your agent something like "give Grace a star for doing the dishes". The star lands on the chart straight away, and the agent replies with the new total and how far off the next reward is. "Undo that star" peels it off again.
+
+A small Cloudflare Worker in `worker/` makes this possible. It holds a GitHub token as a secret, so the agents never see one. They get a private link instead, which can only do three things: add stars, undo the newest star if an agent added it, and read the score. Stars from the Teacher's desk can't be undone this way. Agent stars look the same as any other on the chart, with `source: "agent"` in `data/stars.json`.
+
+- `<worker url>/k/<key>/mcp` is the custom connector address for an agent that supports MCP connectors, such as Duet.
+- `<worker url>/k/<key>` is a private page for anything with a browser. Opening it never awards a star, so a link preview in iMessage is harmless.
+
+A date can be given for an earlier day ("star for yesterday"). Otherwise stars use today in `TIME_ZONE`, set in `worker/wrangler.toml`.
+
+### Setting up the Worker
+
+Make a second fine-grained token as in "Making the token" below, separate from the desk's so either can be revoked alone. Then, signed in to Cloudflare as yourself and choosing your own account if Wrangler asks:
+
+```bash
+cd worker
+npx wrangler deploy
+npx wrangler secret put GITHUB_TOKEN
+```
+
+Then make the private key. This prints the connector address, so keep it to yourself:
+
+```bash
+KEY=$(openssl rand -hex 24) && printf %s "$KEY" | npx wrangler secret put STAR_KEY && echo "<worker url>/k/$KEY/mcp"
+```
+
+**Changing the key:** run that last command again. Both agents stop working until they get the new link, so do this if a link ever leaks. When the token expires, run `npx wrangler secret put GITHUB_TOKEN` with a new one. Replies will say the chart didn't answer until you do.
+
 ## Config
 
 `js/config.js` holds her name, the signature on certificates, and the repo coordinates.

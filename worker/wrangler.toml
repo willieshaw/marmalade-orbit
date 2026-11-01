@@ -1,0 +1,13 @@
+name = "marmalade-orbit-stars"
+main = "index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+TIME_ZONE = "America/New_York"
+
+# Requests carry the secret key in their URL, so nothing gets logged.
+[observability]
+enabled = false
+
+# Secrets, set with `npx wrangler secret put`: GITHUB_TOKEN and STAR_KEY.

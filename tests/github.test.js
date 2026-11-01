@@ -195,3 +195,14 @@ test('appendStars adds several stars in order without mutating', () => {
   assert.deepEqual(out.stars.map(s => s.id), ['a', 'b', 'c']);
   assert.equal(doc.stars.length, 1);
 });
+
+test('makeStar dates a star in the given time zone, not the server clock', () => {
+  const now = new Date('2026-11-02T04:30:00Z'); // 11:30pm on Nov 1 in New York
+  assert.equal(makeStar({ label: 'Late', now, timeZone: 'America/New_York' }).date, '2026-11-01');
+});
+
+test('makeStar and makeStars take an explicit date', () => {
+  assert.equal(makeStar({ label: 'Yesterday', date: '2026-10-30' }).date, '2026-10-30');
+  const stars = makeStars({ labels: ['A', 'B'], date: '2026-10-30', timeZone: 'America/New_York' });
+  assert.deepEqual(stars.map(s => s.date), ['2026-10-30', '2026-10-30']);
+});
