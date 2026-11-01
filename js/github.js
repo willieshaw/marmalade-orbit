@@ -14,21 +14,28 @@ export function decodeBase64Utf8(b64) {
 }
 
 const pad = n => String(n).padStart(2, '0');
-const localDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-export function makeStar({ label, now = new Date() }) {
+// YYYY-MM-DD on the device's clock, or in timeZone when given (a server runs on UTC).
+export function localDate(d, timeZone) {
+  if (!timeZone) return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+  const part = type => parts.find(p => p.type === type).value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+export function makeStar({ label, now = new Date(), timeZone, date = localDate(now, timeZone) }) {
   const clean = (label || '').trim();
   if (!clean) throw new Error('A star needs a label');
   const id = now.getTime().toString(36) + Math.random().toString(36).slice(2, 6);
-  return { id, label: clean, date: localDate(now) };
+  return { id, label: clean, date };
 }
 
 // Several stars at once, one per non-blank label, all dated now.
-export function makeStars({ labels, now = new Date() }) {
+export function makeStars({ labels, now = new Date(), timeZone, date }) {
   const clean = (labels || []).map(l => (l || '').trim()).filter(Boolean);
   if (!clean.length) throw new Error('A star needs a label');
   return clean.map((label, i) => {
-    const star = makeStar({ label, now });
+    const star = makeStar({ label, now, timeZone, date });
     return { ...star, id: `${star.id}${i.toString(36)}` };
   });
 }
