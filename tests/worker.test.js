@@ -8,10 +8,10 @@ const env = { STAR_KEY: KEY, GITHUB_TOKEN: 'TEST', TIME_ZONE: 'America/New_York'
 const NOW = new Date('2026-11-02T04:30:00Z'); // 11:30pm on Nov 1 in New York
 const MIN = 60_000;
 
-function fakeGitHub({ stars = [], rules = [], failPutsWith = [] } = {}) {
+function fakeGitHub({ stars = [], rules = [], redeemed = [], failPutsWith = [] } = {}) {
   const files = {
     'data/stars.json': { doc: { stars }, sha: 'sha1' },
-    'data/rewards.json': { doc: { rules, redeemed: [] }, sha: 'sha1' },
+    'data/rewards.json': { doc: { rules, redeemed }, sha: 'sha1' },
   };
   const puts = [];
   const fetch = async (url, opts = {}) => {
@@ -27,7 +27,12 @@ function fakeGitHub({ stars = [], rules = [], failPutsWith = [] } = {}) {
     puts.push(body.message);
     return { ok: true, status: 200, json: async () => ({}) };
   };
-  return { fetch, puts, get stars() { return files['data/stars.json'].doc.stars; } };
+  return {
+    fetch,
+    puts,
+    get stars() { return files['data/stars.json'].doc.stars; },
+    get rewards() { return files['data/rewards.json'].doc; },
+  };
 }
 
 const call = (gh, path, init, now = NOW) =>
@@ -213,6 +218,81 @@ test('star_status reports the total and recent stars without writing', async () 
   assert.equal(gh.puts.length, 0);
 });
 
+const dessert = { id: 'r1', kind: 'every', every: 2, reward: 'Dessert' };
+const trip = { id: 'r2', kind: 'once', at: 100, reward: 'Weekend trip' };
+const fourStars = () => ['a', 'b', 'c', 'd'].map(id => ({ id, label: id, date: '2026-10-01' }));
+
+test('add_reward adds one-off and repeating rewards and keeps what is redeemed', async () => {
+  const gh = fakeGitHub({ redeemed: ['old@10'] });
+  assert.equal((await tool(gh, 'add_reward', { kind: 'every', stars: 10, reward: ' Dessert ' })).isError, false);
+  assert.equal((await tool(gh, 'add_reward', { kind: 'once', stars: 100, reward: 'Weekend trip' })).isError, false);
+  const [every, once] = gh.rewards.rules;
+  assert.deepEqual([every.kind, every.every, every.reward], ['every', 10, 'Dessert']);
+  assert.deepEqual([once.kind, once.at, once.reward], ['once', 100, 'Weekend trip']);
+  assert.notEqual(every.id, once.id);
+  assert.deepEqual(gh.rewards.redeemed, ['old@10']);
+  assert.ok(gh.puts.includes('Add reward: Dessert'));
+});
+
+test('add_reward refuses bad rewards and repeats, and writes nothing', async () => {
+  const gh = fakeGitHub({ rules: [dessert, trip] });
+  for (const args of [
+    { kind: 'sometimes', stars: 10, reward: 'x' },
+    { kind: 'once', stars: 0, reward: 'x' },
+    { kind: 'once', stars: 1.5, reward: 'x' },
+    { kind: 'once', stars: 5, reward: '   ' },
+    { kind: 'once', stars: 5, reward: 'x'.repeat(81) },
+    { kind: 'once', stars: 100, reward: 'Another at the same spot' },
+    { kind: 'every', stars: 2, reward: 'Dessert' },
+  ]) {
+    assert.equal((await tool(gh, 'add_reward', args)).isError, true, JSON.stringify(args));
+  }
+  assert.equal(gh.puts.length, 0);
+});
+
+test('edit_reward changes any part of a reward, delete_reward removes it', async () => {
+  const gh = fakeGitHub({ rules: [dessert, trip] });
+  await tool(gh, 'edit_reward', { id: 'r1', stars: 5, reward: 'Fancy dessert' });
+  assert.deepEqual(gh.rewards.rules[0], { id: 'r1', kind: 'every', every: 5, reward: 'Fancy dessert' });
+  await tool(gh, 'edit_reward', { id: 'r2', kind: 'every' });
+  assert.deepEqual(gh.rewards.rules[1], { id: 'r2', kind: 'every', every: 100, reward: 'Weekend trip' });
+  assert.match((await tool(gh, 'delete_reward', { id: 'r1' })).text, /Fancy dessert/);
+  assert.deepEqual(gh.rewards.rules.map(r => r.id), ['r2']);
+  assert.equal((await tool(gh, 'delete_reward', { id: 'r1' })).isError, true);
+  assert.equal((await tool(gh, 'edit_reward', { id: 'nope', reward: 'x' })).isError, true);
+  assert.equal((await tool(gh, 'edit_reward', { id: 'r2' })).isError, true);
+});
+
+test('list_rewards shows the rules, ids and what is owed or redeemed', async () => {
+  const gh = fakeGitHub({ stars: fourStars(), rules: [dessert, trip], redeemed: ['r1@2'] });
+  const { text } = await tool(gh, 'list_rewards');
+  assert.match(text, /Every 2 stars: Dessert \(id: r1\)/);
+  assert.match(text, /Once at 100 stars: Weekend trip \(id: r2\)/);
+  assert.match(text, /Owed: Dessert ×1/);
+  assert.match(text, /Redeemed: Dessert ×1/);
+  assert.equal(gh.puts.length, 0);
+  assert.match((await tool(fakeGitHub(), 'list_rewards')).text, /no rewards/i);
+});
+
+test('redeeming takes the oldest owed payout, and undoing the newest redeemed', async () => {
+  const gh = fakeGitHub({ stars: fourStars(), rules: [dessert] });
+  await tool(gh, 'redeem_reward', { id: 'r1' });
+  await tool(gh, 'redeem_reward', { id: 'r1' });
+  assert.deepEqual(gh.rewards.redeemed, ['r1@2', 'r1@4']);
+  assert.equal((await tool(gh, 'redeem_reward', { id: 'r1' })).isError, true);
+  await tool(gh, 'unredeem_reward', { id: 'r1' });
+  assert.deepEqual(gh.rewards.redeemed, ['r1@2']);
+  assert.ok(gh.puts.includes('Redeemed: Dessert (2★)'));
+  assert.ok(gh.puts.includes('Un-redeemed: Dessert (4★)'));
+});
+
+test('unredeem and redeem refuse when there is nothing to change', async () => {
+  const gh = fakeGitHub({ stars: fourStars(), rules: [dessert] });
+  assert.equal((await tool(gh, 'unredeem_reward', { id: 'r1' })).isError, true);
+  assert.equal((await tool(gh, 'redeem_reward', { id: 'nope' })).isError, true);
+  assert.equal(gh.puts.length, 0);
+});
+
 test('a stale write retries, and a GitHub failure comes back as a tool error', async () => {
   const retried = fakeGitHub({ failPutsWith: [409] });
   await tool(retried, 'add_stars', { labels: ['Dishes'] });
@@ -232,7 +312,10 @@ test('MCP initialize, tools/list, notifications and errors follow the protocol',
   assert.match(old.result.protocolVersion, /^\d{4}-\d{2}-\d{2}$/);
   assert.notEqual(old.result.protocolVersion, '1999-01-01');
   const list = await rpc(gh, 'tools/list');
-  assert.deepEqual(list.result.tools.map(t => t.name).sort(), ['add_stars', 'delete_star', 'edit_star', 'list_stars', 'star_status', 'undo_last_star']);
+  assert.deepEqual(list.result.tools.map(t => t.name).sort(), [
+    'add_reward', 'add_stars', 'delete_reward', 'delete_star', 'edit_reward', 'edit_star', 'list_rewards',
+    'list_stars', 'redeem_reward', 'star_status', 'undo_last_star', 'unredeem_reward',
+  ]);
   assert.ok(list.result.tools.every(t => t.description && t.inputSchema));
   assert.deepEqual((await rpc(gh, 'ping')).result, {});
   assert.equal((await rpc(gh, 'nope')).error.code, -32601);

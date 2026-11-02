@@ -3,7 +3,8 @@
 
 import { handleMcp } from './mcp.js';
 import { renderPage } from './page.js';
-import { createDesk, StarError } from './stars.js';
+import { StarError } from './clean.js';
+import { createDesk } from './stars.js';
 
 const ROUTE = /^\/k\/([^/]+)(?:\/(mcp|stars|undo))?\/?$/;
 const MIN_KEY_LENGTH = 32;
@@ -65,6 +66,12 @@ export async function handle(request, env, { fetch, now = new Date() }) {
       list_stars: desk.list,
       edit_star: desk.edit,
       delete_star: desk.remove,
+      list_rewards: desk.listRewards,
+      add_reward: desk.addReward,
+      edit_reward: desk.editReward,
+      delete_reward: desk.deleteReward,
+      redeem_reward: desk.redeemReward,
+      unredeem_reward: desk.unredeemReward,
       star_status: desk.status,
     };
     return handleMcp(request, (name, args) => attempt(() => tools[name](args)));

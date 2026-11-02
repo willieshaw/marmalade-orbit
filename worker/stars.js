@@ -1,24 +1,24 @@
 // What an agent can do to the chart: everything the desk's Award and Stars tabs
-// can. Every reply is written to be passed on by text.
+// can, plus the Rewards tab from rewards.js. Every reply is written to be passed
+// on by text.
 
 import { config } from '../js/config.js';
 import { appendStars, createClient, deleteStar, editStar, localDate, makeStars, removeLastStar } from '../js/github.js';
 import { normalizeStars } from '../js/data.js';
 import { nextOccurrences, normalizeRewardsDoc, occurrences } from '../js/rewards.js';
+import { cleanText, StarError } from './clean.js';
+import { createRewardDesk } from './rewards.js';
 
 const MAX_LABEL = 80;
 const MAX_STARS = 10;
 const MAX_LISTED = 50;
 const RETRY_WINDOW_MS = 2 * 60 * 1000;
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
 
-// A refusal the agent should pass on, as opposed to something breaking.
-export class StarError extends Error {}
 class AlreadyAdded extends Error {}
 
 function cleanLabels(labels) {
   if (!Array.isArray(labels)) throw new StarError('Send labels as a list of what she did.');
-  const clean = labels.map(l => String(l ?? '').replace(CONTROL_CHARS, '').trim()).filter(Boolean);
+  const clean = labels.map(cleanText).filter(Boolean);
   if (!clean.length) throw new StarError('A star needs a label.');
   if (clean.length > MAX_STARS) throw new StarError(`That's a lot of stars! ${MAX_STARS} at a time, please.`);
   if (clean.some(l => l.length > MAX_LABEL)) throw new StarError(`Keep each star to ${MAX_LABEL} characters.`);
@@ -144,5 +144,5 @@ export function createDesk({ fetch, token, timeZone, now }) {
     ].filter(Boolean).join(' ');
   }
 
-  return { add, undo, list, edit, remove, status };
+  return { add, undo, list, edit, remove, status, ...createRewardDesk({ stars, rewards }) };
 }
