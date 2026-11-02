@@ -136,15 +136,65 @@ test('the same label from the desk moments ago is not treated as a retry', async
   assert.equal(gh.stars.length, 2);
 });
 
-test('undo removes agent stars and stops at the first desk star', async () => {
+test('undo removes the newest star, whoever added it', async () => {
   const gh = fakeGitHub({ stars: [{ id: 'a', label: 'From the desk', date: '2026-10-15' }] });
-  await tool(gh, 'add_stars', { labels: ['Dishes', 'Laundry'] });
+  await tool(gh, 'add_stars', { labels: ['Dishes'] });
   assert.equal((await tool(gh, 'undo_last_star')).isError, false);
-  assert.equal((await tool(gh, 'undo_last_star')).isError, false);
-  assert.deepEqual(gh.stars.map(s => s.label), ['From the desk']);
+  assert.match((await tool(gh, 'undo_last_star')).text, /From the desk/);
+  assert.deepEqual(gh.stars, []);
+  assert.deepEqual(gh.puts.slice(-2), ['Undo star: Dishes', 'Undo star: From the desk']);
   assert.equal((await tool(gh, 'undo_last_star')).isError, true);
-  assert.deepEqual(gh.stars.map(s => s.label), ['From the desk']);
-  assert.ok(gh.puts.includes('Undo star: Laundry'));
+});
+
+const twoStars = () => [
+  { id: 'a', label: 'Went to bed early', date: '2026-10-15' },
+  { id: 'b', label: 'Did the dishes', date: '2026-10-20' },
+];
+
+test('list_stars shows ids, newest first, and can search without writing', async () => {
+  const gh = fakeGitHub({ stars: twoStars() });
+  const all = (await tool(gh, 'list_stars')).text;
+  assert.ok(all.indexOf('Did the dishes') < all.indexOf('Went to bed early'));
+  assert.match(all, /\ba\b/);
+  const hit = (await tool(gh, 'list_stars', { query: 'DISHES' })).text;
+  assert.match(hit, /Did the dishes/);
+  assert.doesNotMatch(hit, /Went to bed/);
+  assert.match((await tool(gh, 'list_stars', { query: 'nothing like this' })).text, /no stars/i);
+  assert.equal(gh.puts.length, 0);
+});
+
+test('edit_star changes the label or date of any star', async () => {
+  const gh = fakeGitHub({ stars: twoStars() });
+  assert.equal((await tool(gh, 'edit_star', { id: 'a', label: ' Bed by 10pm ' })).isError, false);
+  assert.equal((await tool(gh, 'edit_star', { id: 'a', date: '2026-10-16' })).isError, false);
+  assert.deepEqual(gh.stars[0], { id: 'a', label: 'Bed by 10pm', date: '2026-10-16' });
+  assert.equal(gh.stars[1].label, 'Did the dishes');
+  assert.ok(gh.puts.includes('Edit star: Bed by 10pm'));
+});
+
+test('edit_star refuses bad changes and writes nothing', async () => {
+  const gh = fakeGitHub({ stars: twoStars() });
+  for (const args of [
+    { id: 'nope', label: 'x' },
+    { id: 'a' },
+    { id: 'a', label: '   ' },
+    { id: 'a', label: 'x'.repeat(81) },
+    { id: 'a', date: '2026-11-02' },
+    { id: 'a', date: 'yesterday' },
+    { label: 'x' },
+  ]) {
+    assert.equal((await tool(gh, 'edit_star', args)).isError, true, JSON.stringify(args));
+  }
+  assert.equal(gh.puts.length, 0);
+});
+
+test('delete_star removes any star by id, and refuses an unknown id', async () => {
+  const gh = fakeGitHub({ stars: twoStars() });
+  assert.match((await tool(gh, 'delete_star', { id: 'a' })).text, /Went to bed early/);
+  assert.deepEqual(gh.stars.map(s => s.id), ['b']);
+  assert.deepEqual(gh.puts, ['Delete star: Went to bed early']);
+  assert.equal((await tool(gh, 'delete_star', { id: 'a' })).isError, true);
+  assert.equal(gh.puts.length, 1);
 });
 
 test('replies count towards the next reward and announce one just earned', async () => {
@@ -182,7 +232,7 @@ test('MCP initialize, tools/list, notifications and errors follow the protocol',
   assert.match(old.result.protocolVersion, /^\d{4}-\d{2}-\d{2}$/);
   assert.notEqual(old.result.protocolVersion, '1999-01-01');
   const list = await rpc(gh, 'tools/list');
-  assert.deepEqual(list.result.tools.map(t => t.name).sort(), ['add_stars', 'star_status', 'undo_last_star']);
+  assert.deepEqual(list.result.tools.map(t => t.name).sort(), ['add_stars', 'delete_star', 'edit_star', 'list_stars', 'star_status', 'undo_last_star']);
   assert.ok(list.result.tools.every(t => t.description && t.inputSchema));
   assert.deepEqual((await rpc(gh, 'ping')).result, {});
   assert.equal((await rpc(gh, 'nope')).error.code, -32601);
@@ -204,10 +254,9 @@ test('the page form awards one star per line and shows the result', async () => 
 
 test('the page form can undo, and shows a refusal as a message', async () => {
   const gh = fakeGitHub({ stars: [{ id: 'a', label: 'From the desk', date: '2026-10-15' }] });
-  const res = await postForm(gh, '/undo', {});
-  assert.equal(res.status, 200);
-  assert.match(await res.text(), /desk/i);
-  assert.equal(gh.stars.length, 1);
+  assert.match(await (await postForm(gh, '/undo', {})).text(), /Peeled off/);
+  assert.equal(gh.stars.length, 0);
+  assert.match(await (await postForm(gh, '/undo', {})).text(), /empty/i);
 });
 
 test('the page escapes whatever it shows', async () => {

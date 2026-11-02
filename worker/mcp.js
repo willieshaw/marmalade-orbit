@@ -19,9 +19,42 @@ const TOOLS = [
   },
   {
     name: 'undo_last_star',
-    description: "Remove the newest star, if it was added by an agent. Stars from the Teacher's desk can't be removed this way.",
+    description: 'Remove the newest star on the chart, whoever added it.',
     inputSchema: { type: 'object', properties: {} },
     annotations: { title: 'Undo the last star', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  },
+  {
+    name: 'list_stars',
+    description: "List Grace's stars, newest first, with the ids edit_star and delete_star need. Can search by words or date.",
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Words from the label, or part of a date like 2026-10.' } },
+    },
+    annotations: { title: 'List stars', readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'edit_star',
+    description: "Fix the label or date of any star. Find its id with list_stars first.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The id from list_stars.' },
+        label: { type: 'string', maxLength: 80, description: 'The new label, if it should change.' },
+        date: { type: 'string', description: 'The new date as YYYY-MM-DD, if it should change.' },
+      },
+      required: ['id'],
+    },
+    annotations: { title: 'Edit a star', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: 'delete_star',
+    description: "Delete any star. Find its id with list_stars first, and only do this when Willie asks.",
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The id from list_stars.' } },
+      required: ['id'],
+    },
+    annotations: { title: 'Delete a star', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   },
   {
     name: 'star_status',
@@ -59,7 +92,7 @@ export async function handleMcp(request, run) {
         protocolVersion: VERSIONS.includes(params?.protocolVersion) ? params.protocolVersion : VERSIONS[0],
         capabilities: { tools: {} },
         serverInfo: { name: 'marmalade-orbit-stars', version: '1.0.0' },
-        instructions: "Awards gold stars on Grace's sticker chart for Willie. Award right away when he asks, then pass on the reply.",
+        instructions: "Awards gold stars on Grace's sticker chart for Willie. Award right away when he asks, then pass on the reply. Only edit or delete stars when he asks.",
       });
     case 'ping':
       return reply(id, {});
