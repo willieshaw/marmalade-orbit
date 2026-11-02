@@ -1,11 +1,4 @@
 {
-  "rules": [
-    {
-      "id": "rmvyid65gisy",
-      "kind": "once",
-      "at": 9999,
-      "reward": "Reward test, renamed"
-    }
-  ],
+  "rules": [],
   "redeemed": []
 }
