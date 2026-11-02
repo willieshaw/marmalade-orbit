@@ -30,9 +30,9 @@ github.com → Settings → Developer settings → Fine-grained personal access 
 
 ## Texting a star (Duet or Instinct)
 
-Text your agent something like "give Grace a star for doing the dishes". The star lands on the chart straight away, and the agent replies with the new total and how far off the next reward is. "Undo that star" peels it off again.
+Text your agent something like "give Grace a star for doing the dishes". The star lands on the chart straight away, and the agent replies with the new total and how far off the next reward is. "Undo that star" peels it off again, and "change yesterday's star to say she made pancakes" fixes one.
 
-A small Cloudflare Worker in `worker/` makes this possible. It holds a GitHub token as a secret, so the agents never see one. They get a private link instead, which can only do three things: add stars, undo the newest star if an agent added it, and read the score. Stars from the Teacher's desk can't be undone this way. Agent stars look the same as any other on the chart, with `source: "agent"` in `data/stars.json`.
+A small Cloudflare Worker in `worker/` makes this possible. It holds a GitHub token as a secret, so the agents never see one. They get a private link instead, which can do everything the desk can do to stars: add, undo the newest, edit any label or date, delete any star, and search them. It can't touch rewards, the site or anything else in the repo. So treat the link like the desk password: anyone holding it could delete stars, though git history can always bring them back. Agent-added stars look the same as any other on the chart, with `source: "agent"` in `data/stars.json`.
 
 - `<worker url>/k/<key>/mcp` is the custom connector address for an agent that supports MCP connectors, such as Duet.
 - `<worker url>/k/<key>` is a private page for anything with a browser. Opening it never awards a star, so a link preview in iMessage is harmless.

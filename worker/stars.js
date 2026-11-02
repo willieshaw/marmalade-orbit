@@ -1,13 +1,14 @@
-// What an agent is allowed to do to the chart: add stars, undo its own latest
-// star, and read the score. Every reply is written to be passed on by text.
+// What an agent can do to the chart: everything the desk's Award and Stars tabs
+// can. Every reply is written to be passed on by text.
 
 import { config } from '../js/config.js';
-import { appendStars, createClient, localDate, makeStars, removeLastStar } from '../js/github.js';
+import { appendStars, createClient, deleteStar, editStar, localDate, makeStars, removeLastStar } from '../js/github.js';
 import { normalizeStars } from '../js/data.js';
 import { nextOccurrences, normalizeRewardsDoc, occurrences } from '../js/rewards.js';
 
 const MAX_LABEL = 80;
 const MAX_STARS = 10;
+const MAX_LISTED = 50;
 const RETRY_WINDOW_MS = 2 * 60 * 1000;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
 
@@ -92,12 +93,44 @@ export function createDesk({ fetch, token, timeZone, now }) {
     const saved = await stars.update(doc => {
       const last = doc?.stars?.at(-1);
       if (!last) throw new StarError('The chart is empty.');
-      if (last.source !== 'agent') {
-        throw new StarError(`The newest star, “${last.label}”, came from the Teacher's desk, so only the desk can remove it.`);
-      }
       return removeLastStar(doc);
     }, `Undo star: ${current?.stars?.at(-1)?.label}`);
     return `Peeled off “${current.stars.at(-1).label}”. ${plural(normalizeStars(saved).length)} left on the chart.`;
+  }
+
+  async function find(id) {
+    const { doc } = await stars.read();
+    const star = doc?.stars?.find(s => s.id === id);
+    if (!star) throw new StarError('No star with that id. list_stars shows them.');
+    return star;
+  }
+
+  async function list({ query } = {}) {
+    const { doc } = await stars.read();
+    const q = String(query ?? '').trim().toLowerCase();
+    const hits = normalizeStars(doc)
+      .filter(s => !q || s.label.toLowerCase().includes(q) || s.date.includes(q))
+      .reverse();
+    if (!hits.length) return q ? `No stars match “${query}”.` : 'No stars yet.';
+    const lines = hits.slice(0, MAX_LISTED).map(s => `${s.date}  ${s.label}  (id: ${s.id})`);
+    if (hits.length > MAX_LISTED) lines.unshift(`Newest ${MAX_LISTED} of ${hits.length}:`);
+    return lines.join('\n');
+  }
+
+  async function edit({ id, label, date }) {
+    const newLabel = label === undefined ? undefined : cleanLabels([label])[0];
+    const newDate = cleanDate(date, localDate(now, timeZone));
+    if (newLabel === undefined && newDate === undefined) throw new StarError('Send a new label or date.');
+    const star = await find(id);
+    const name = newLabel ?? star.label;
+    await stars.update(doc => editStar(doc, id, { label: newLabel, date: newDate }), `Edit star: ${name}`);
+    return `Fixed: “${name}” (${newDate ?? star.date}).`;
+  }
+
+  async function remove({ id }) {
+    const star = await find(id);
+    const saved = await stars.update(doc => deleteStar(doc, id), `Delete star: ${star.label}`);
+    return `Deleted “${star.label}”. ${plural(normalizeStars(saved).length)} left on the chart.`;
   }
 
   async function status() {
@@ -111,5 +144,5 @@ export function createDesk({ fetch, token, timeZone, now }) {
     ].filter(Boolean).join(' ');
   }
 
-  return { add, undo, status };
+  return { add, undo, list, edit, remove, status };
 }

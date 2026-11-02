@@ -59,10 +59,15 @@ export async function handle(request, env, { fetch, now = new Date() }) {
   const desk = createDesk({ fetch, token: env.GITHUB_TOKEN, timeZone: env.TIME_ZONE, now });
 
   if (section === 'mcp') {
-    return handleMcp(request, (name, args) => attempt(() => {
-      if (name === 'add_stars') return desk.add(args);
-      return name === 'undo_last_star' ? desk.undo() : desk.status();
-    }));
+    const tools = {
+      add_stars: desk.add,
+      undo_last_star: desk.undo,
+      list_stars: desk.list,
+      edit_star: desk.edit,
+      delete_star: desk.remove,
+      star_status: desk.status,
+    };
+    return handleMcp(request, (name, args) => attempt(() => tools[name](args)));
   }
   if (!section) return request.method === 'GET' ? html(renderPage({ base })) : notAllowed('GET');
   if (request.method !== 'POST') return notAllowed('POST');
