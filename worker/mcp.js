@@ -57,6 +57,71 @@ const TOOLS = [
     annotations: { title: 'Delete a star', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   },
   {
+    name: 'list_rewards',
+    description: "List the reward rules with their ids, plus what's owed and already redeemed.",
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { title: 'List rewards', readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'add_reward',
+    description: 'Add a reward that pays out once at a star count, or repeats every so many stars.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['once', 'every'], description: '"once" pays out at that total, "every" repeats.' },
+        stars: { type: 'integer', minimum: 1, description: 'The star count.' },
+        reward: { type: 'string', maxLength: 80, description: 'What she gets.' },
+      },
+      required: ['kind', 'stars', 'reward'],
+    },
+    annotations: { title: 'Add a reward', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: 'edit_reward',
+    description: 'Change a reward. Send its id from list_rewards and only what should change.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The id from list_rewards.' },
+        kind: { type: 'string', enum: ['once', 'every'] },
+        stars: { type: 'integer', minimum: 1 },
+        reward: { type: 'string', maxLength: 80 },
+      },
+      required: ['id'],
+    },
+    annotations: { title: 'Edit a reward', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: 'delete_reward',
+    description: 'Delete a reward. Find its id with list_rewards first, and only do this when Willie asks.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The id from list_rewards.' } },
+      required: ['id'],
+    },
+    annotations: { title: 'Delete a reward', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  },
+  {
+    name: 'redeem_reward',
+    description: "Mark the oldest owed payout of a reward as redeemed, once Grace has had it.",
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The id from list_rewards.' } },
+      required: ['id'],
+    },
+    annotations: { title: 'Redeem a reward', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
+    name: 'unredeem_reward',
+    description: 'Undo the newest redeemed payout of a reward, so it counts as owed again.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The id from list_rewards.' } },
+      required: ['id'],
+    },
+    annotations: { title: 'Undo a redemption', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  },
+  {
     name: 'star_status',
     description: "How many stars Grace has, her latest stars, and how far off the next reward is.",
     inputSchema: { type: 'object', properties: {} },
@@ -92,7 +157,7 @@ export async function handleMcp(request, run) {
         protocolVersion: VERSIONS.includes(params?.protocolVersion) ? params.protocolVersion : VERSIONS[0],
         capabilities: { tools: {} },
         serverInfo: { name: 'marmalade-orbit-stars', version: '1.0.0' },
-        instructions: "Awards gold stars on Grace's sticker chart for Willie. Award right away when he asks, then pass on the reply. Only edit or delete stars when he asks.",
+        instructions: "Awards gold stars on Grace's sticker chart for Willie. Award right away when he asks, then pass on the reply. Only edit or delete stars or rewards when he asks.",
       });
     case 'ping':
       return reply(id, {});
