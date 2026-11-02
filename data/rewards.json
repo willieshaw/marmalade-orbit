@@ -3,8 +3,8 @@
     {
       "id": "rmvyid65gisy",
       "kind": "once",
-      "at": 1,
-      "reward": "Reward test"
+      "at": 9999,
+      "reward": "Reward test, renamed"
     }
   ],
   "redeemed": []
